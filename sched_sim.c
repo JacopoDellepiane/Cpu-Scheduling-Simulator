@@ -9,7 +9,7 @@ typedef struct {
   int quantum;
 } SchedRRArgs;
 
-void schedRR(FakeOS* os, void* args_){
+void schedRR(FakeOS* os, void* args_, int i){                                                 // passing the index of the i-th cpu
   SchedRRArgs* args=(SchedRRArgs*)args_;
 
   // look for the first process in ready
@@ -18,7 +18,7 @@ void schedRR(FakeOS* os, void* args_){
     return;
 
   FakePCB* pcb=(FakePCB*) List_popFront(&os->ready);
-  os->running=pcb;
+  os->running[i]=pcb;                                                                         // assign a process to the i-th cpu
   
   assert(pcb->events.first);
   ProcessEvent* e = (ProcessEvent*)pcb->events.first;
@@ -39,7 +39,10 @@ void schedRR(FakeOS* os, void* args_){
 };
 
 int main(int argc, char** argv) {
-  FakeOS_init(&os);
+  int N;                                                                                      // variable to store the number of cpus to use
+  printf("Enter the number of cpus to use in this simulation: ");
+  scanf("%d", &N);
+  FakeOS_init(&os, N);
   SchedRRArgs srr_args;
   srr_args.quantum=5;
   os.schedule_args=&srr_args;
@@ -57,10 +60,13 @@ int main(int argc, char** argv) {
     }
   }
   printf("num processes in queue %d\n", os.processes.size);
-  while(os.running
-        || os.ready.first
-        || os.waiting.first
-        || os.processes.first){
-    FakeOS_simStep(&os);
+  for (int i = 0; i < os.N; i++) {                                                            // check on all the cpus
+    while(os.running[i]
+          || os.ready.first
+          || os.waiting.first
+          || os.processes.first){
+      FakeOS_simStep(&os);
+    }
   }
+  free(os.running);
 }

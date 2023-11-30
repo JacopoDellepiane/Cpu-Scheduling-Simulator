@@ -2,7 +2,6 @@
 #include "linked_list.h"
 #pragma once
 
-
 typedef struct {
   ListItem list;
   int pid;
@@ -10,10 +9,11 @@ typedef struct {
 } FakePCB;
 
 struct FakeOS;
-typedef void (*ScheduleFn)(struct FakeOS* os, void* args);
+typedef void (*ScheduleFn)(struct FakeOS* os, void* args, int i);
 
 typedef struct FakeOS{
-  FakePCB* running;
+  int N;                                                                  // N cpus
+  FakePCB** running;                                                      // pointer to switch between the N FakePCB pointers
   ListHead ready;
   ListHead waiting;
   int timer;
@@ -23,6 +23,6 @@ typedef struct FakeOS{
   ListHead processes;
 } FakeOS;
 
-void FakeOS_init(FakeOS* os);
+void FakeOS_init(FakeOS* os, int N);
 void FakeOS_simStep(FakeOS* os);
 void FakeOS_destroy(FakeOS* os);
