@@ -133,7 +133,7 @@ void FakeOS_simStep(FakeOS* os){
   // if last event, destroy running
   for (int i = 0; i < os->N; i++) {                                                 // check on every running process
     FakePCB* running=os->running[i];
-    printf("\trunning pid: %d\n", running?running->pid:-1);
+    printf("cpu: %d, running pid: %d\n", i, running?running->pid:-1);
     if (running) {
       ProcessEvent* e=(ProcessEvent*) running->events.first;
       assert(e->type==CPU);
@@ -183,4 +183,5 @@ void FakeOS_simStep(FakeOS* os){
 }
 
 void FakeOS_destroy(FakeOS* os) {
+  free(os->running);
 }

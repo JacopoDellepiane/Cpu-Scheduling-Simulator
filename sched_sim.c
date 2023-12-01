@@ -68,5 +68,5 @@ int main(int argc, char** argv) {
       FakeOS_simStep(&os);
     }
   }
-  free(os.running);
+  FakeOS_destroy(&os);
 }
