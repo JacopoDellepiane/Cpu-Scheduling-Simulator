@@ -5,6 +5,46 @@
 
 FakeOS os;
 
+void schedSJF(FakeOS* os, void* args_, int i) {
+  if (! os->ready.first)                                                                
+    return;
+
+  ListItem* b = os->ready.first;                                                              // take the first process in ready
+  FakePCB* pcb=(FakePCB*)(b);   
+  ProcessEvent* e = (ProcessEvent*)pcb->events.first;
+  int value = e->duration;                                                                    // use the first process to initialize the comparison variables
+  ListItem* shortest = b;
+  b = b->next;
+  while(b) {                                                                                  // cycle through the ready list searching for a shorter process's burst
+    FakePCB* pcb2 =(FakePCB*)(b);   
+    ProcessEvent* f = (ProcessEvent*)pcb2->events.first;
+    if (f->duration < value) {
+        value = f->duration;
+        shortest = b;
+    }
+    b = b->next;
+  }
+ 
+  if (!os->running[i]) {                                                                      // if the os isn't running anything, run the process with the shortest burst
+    FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, shortest));                                   
+    os->running[i]=pcb1;
+    assert(pcb1->events.first);                                                           
+    ProcessEvent* e3 = (ProcessEvent*)pcb1->events.first;                                  
+    assert(e3->type==CPU); 
+  }
+  else {                                                                                      // if all the cpus are running a process, check if there's a process with a shortest burst and do a preemption
+    ProcessEvent* running_burst = (ProcessEvent*) os->running[i]->events.first;
+    if (running_burst->duration > value) {
+      FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, shortest));
+      List_pushBack(&os->ready, (ListItem*) os->running[i]); 
+      os->running[i]=pcb1;
+      assert(pcb1->events.first);                                
+      ProcessEvent* e3 = (ProcessEvent*)pcb1->events.first;                     
+      assert(e3->type==CPU); 
+    }
+  }
+}
+
 typedef struct {
   int quantum;
 } SchedRRArgs;
@@ -46,7 +86,7 @@ int main(int argc, char** argv) {
   SchedRRArgs srr_args;
   srr_args.quantum=5;
   os.schedule_args=&srr_args;
-  os.schedule_fn=schedRR;
+  os.schedule_fn=schedSJF;
   
   for (int i=1; i<argc; ++i){
     FakeProcess new_process;

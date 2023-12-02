@@ -166,8 +166,8 @@ void FakeOS_simStep(FakeOS* os){
 
 
   // call schedule, if defined
-  for (int i = 0; i < os->N; i++) {                                                 // call schedule on every cpus without a running process
-    if (os->schedule_fn && ! os->running[i]){
+  for (int i = 0; i < os->N; i++) {                                                 // call schedule on every cpus to verify if preemption is needed
+    if (os->schedule_fn){
       (*os->schedule_fn)(os, os->schedule_args, i);                                 // pass the i-th cpu to the schedule function
     }
 
