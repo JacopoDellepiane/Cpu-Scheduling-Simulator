@@ -5,42 +5,54 @@
 
 FakeOS os;
 
+typedef struct {
+  float prediction;
+  float best;                                                                                 // best/shortest prediction value
+  ListItem* shortest;                                                                         // process with the shortest prediction
+} SchedSJFArgs;                                                                                
+
 void schedSJF(FakeOS* os, void* args_, int i) {
+  SchedSJFArgs* args = (SchedSJFArgs*) args_;
+
   if (! os->ready.first)                                                                
     return;
 
   ListItem* b = os->ready.first;                                                              // take the first process in ready
   FakePCB* pcb=(FakePCB*)(b);   
   ProcessEvent* e = (ProcessEvent*)pcb->events.first;
-  int value = e->duration;                                                                    // use the first process to initialize the comparison variables
-  ListItem* shortest = b;
+  args->prediction = 0.5 * e->duration + 0.5 * args->prediction;
+  args->best = args->prediction;                                                              // use the first process to initialize the best prediction
+  args->shortest = b;
   b = b->next;
   while(b) {                                                                                  // cycle through the ready list searching for a shorter process's burst
     FakePCB* pcb2 =(FakePCB*)(b);   
     ProcessEvent* f = (ProcessEvent*)pcb2->events.first;
-    if (f->duration < value) {
-        value = f->duration;
-        shortest = b;
+    args->prediction = 0.5 * f->duration + 0.5 * args->prediction;
+    if (args->prediction < args->best) {
+        args->best = args->prediction;
+        args->shortest = b;
     }
     b = b->next;
   }
  
   if (!os->running[i]) {                                                                      // if the os isn't running anything, run the process with the shortest burst
-    FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, shortest));                                   
+    FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, args->shortest));                                   
     os->running[i]=pcb1;
     assert(pcb1->events.first);                                                           
     ProcessEvent* e3 = (ProcessEvent*)pcb1->events.first;                                  
     assert(e3->type==CPU); 
+    args->prediction = 0.0;
   }
   else {                                                                                      // if all the cpus are running a process, check if there's a process with a shortest burst and do a preemption
     ProcessEvent* running_burst = (ProcessEvent*) os->running[i]->events.first;
-    if (running_burst->duration > value) {
-      FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, shortest));
+    if (running_burst->duration > args->prediction) {
+      FakePCB* pcb1=(FakePCB*) List_detach(&os->ready, List_find(&os->ready, args->shortest));
       List_pushBack(&os->ready, (ListItem*) os->running[i]); 
       os->running[i]=pcb1;
       assert(pcb1->events.first);                                
       ProcessEvent* e3 = (ProcessEvent*)pcb1->events.first;                     
       assert(e3->type==CPU); 
+      args->prediction = 0.0;
     }
   }
 }
@@ -86,6 +98,12 @@ int main(int argc, char** argv) {
   SchedRRArgs srr_args;
   srr_args.quantum=5;
   os.schedule_args=&srr_args;
+
+  SchedSJFArgs ssjf_args;
+  ssjf_args.prediction = 0.0;
+  ssjf_args.best = 5000.0;
+  ssjf_args.shortest = NULL;
+  os.schedule_args = &ssjf_args;
   os.schedule_fn=schedSJF;
   
   for (int i=1; i<argc; ++i){
