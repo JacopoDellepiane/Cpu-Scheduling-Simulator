@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include "fake_os.h"
 
 FakeOS os;
@@ -67,8 +68,12 @@ typedef struct {
 } SchedRRArgs;
 
 void schedRR(FakeOS* os, void* args_, int i){                                                   // passing the index of the i-th cpu
-  SchedRRArgs* args=(SchedRRArgs*)args_;
 
+  if (os->running[i])
+    return;
+
+  SchedRRArgs* args=(SchedRRArgs*)args_;
+  
   // look for the first process in ready
   // if none, return
   if (! os->ready.first)
@@ -97,20 +102,27 @@ void schedRR(FakeOS* os, void* args_, int i){                                   
 
 int main(int argc, char** argv) {
   int N;                                                                                        // variable to store the number of cpus to use
+  char schedule[9];                                                                             // stores the scheduling algorithm to use
   printf("Enter the number of cpus to use in this simulation: ");
   scanf("%d", &N);
+  printf("Choose the scheduling algorithm to use between schedRR and schedSJF: ");
+  scanf("%s", schedule);
   FakeOS_init(&os, N);
   SchedRRArgs srr_args;
-  srr_args.quantum=5;
-  os.schedule_args=&srr_args;
-
   SchedSJFArgs ssjf_args;
-  ssjf_args.prediction = 0.0;
-  ssjf_args.best = 0.0;
-  ssjf_args.running_prediction = 0.0;
-  ssjf_args.shortest = NULL;
-  os.schedule_args = &ssjf_args;
-  os.schedule_fn=schedSJF;
+  if (strcmp(schedule, "schedRR") == 0) {
+    srr_args.quantum = 5;
+    os.schedule_args = &srr_args;
+    os.schedule_fn = schedRR;
+  }
+  if (strcmp(schedule, "schedSJF") == 0) {
+    ssjf_args.prediction = 0.0;
+    ssjf_args.best = 0.0;
+    ssjf_args.running_prediction = 0.0;
+    ssjf_args.shortest = NULL;
+    os.schedule_args = &ssjf_args;
+    os.schedule_fn = schedSJF;
+  }
   
   for (int i=1; i<argc; ++i){
     FakeProcess new_process;
