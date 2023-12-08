@@ -5,6 +5,8 @@
 typedef struct {
   ListItem list;
   int pid;
+  int q_current;                                                          // process's time quantum
+  float prediction;                                                       // process's quantum prediction
   ListHead events;
 } FakePCB;
 

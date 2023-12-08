@@ -7,60 +7,53 @@
 FakeOS os;
 
 typedef struct {
-  float prediction;                                                                             // prediction
   float best;                                                                                   // best prediction value in the ready list
-  float running_prediction;                                                                     // prediction of the running process to update with the new duration
   ListItem* shortest;                                                                           // process with the shortest prediction
-} SchedSJFArgs;                                                                                
-
+} SchedSJFArgs;  
+                                                                            
 void schedSJF(FakeOS* os, void* args_, int i) {
   SchedSJFArgs* args = (SchedSJFArgs*) args_;
 
-  if (! os->ready.first)                                                                
-    return;
-  
-  if (os->running[i]) {
-    ProcessEvent* running_burst = (ProcessEvent*) os->running[i]->events.first;
-    args->running_prediction = 0.5 * running_burst->duration + 0.5 * args->running_prediction;  // update the prediction of the running process with the current duration
+  if (os->ready.first) {                                                            
+    ListItem* b = os->ready.first;                                                              // take the first process in ready
+    FakePCB* pcb = (FakePCB*)(b);   
+    args->best = pcb->prediction;                                                               // use the first process to initialize the best prediction
+    //printf("pid: %d, prediction: %f\n", pcb->pid, pcb->prediction);
+    args->shortest = b;
+    b = b->next;
+    while(b) {                                                                                  // cycle through the ready list searching for a shorter prediction
+      FakePCB* pcb1 = (FakePCB*)(b);   
+      //printf("pid: %d, prediction: %f\n", pcb1->pid, pcb1->prediction);
+      if (pcb1->prediction < args->best) {
+          args->best = pcb1->prediction;
+          args->shortest = b;
+      }
+      b = b->next;
+    }
+    if (!os->running[i]) {                                                                      // if the os isn't running anything, run the process with the shortest prediction
+      FakePCB* pcb2 = (FakePCB*) List_detach(&os->ready, args->shortest);                                   
+      assert(pcb2->events.first);                                                           
+      ProcessEvent* e2 = (ProcessEvent*)pcb2->events.first;                                  
+      assert(e2->type==CPU); 
+      os->running[i] = pcb2;                                              
+    }
+    else {                                                                                      // if all the cpus are running a process, check if there's a process with a shortest prediction and do a preemption                                                    
+      if (os->running[i]->prediction > args->best) {                                            
+        FakePCB* pcb2 = (FakePCB*) List_detach(&os->ready, args->shortest);
+        List_pushBack(&os->ready, (ListItem*) os->running[i]); 
+        assert(pcb2->events.first);                                
+        ProcessEvent* e2 = (ProcessEvent*)pcb2->events.first;                     
+        assert(e2->type==CPU); 
+        os->running[i] = pcb2;                   
+      }
+    }
   }
 
-  ListItem* b = os->ready.first;                                                                // take the first process in ready
-  FakePCB* pcb = (FakePCB*)(b);   
-  ProcessEvent* e = (ProcessEvent*)pcb->events.first;
-  args->prediction = 0.5 * e->duration + 0.5 * args->prediction;
-  args->best = args->prediction;                                                                // use the first process to initialize the best prediction
-  args->shortest = b;
-  b = b->next;
-  while(b) {                                                                                    // cycle through the ready list searching for a shorter process's burst
-    FakePCB* pcb1 = (FakePCB*)(b);   
-    ProcessEvent* e1 = (ProcessEvent*)pcb1->events.first;
-    args->prediction = 0.5 * e1->duration + 0.5 * args->prediction;
-    if (args->prediction < args->best) {
-        args->best = args->prediction;
-        args->shortest = b;
-    }
-    b = b->next;
-  }
- 
-  if (!os->running[i]) {                                                                        // if the os isn't running anything, run the process with the shortest burst
-    FakePCB* pcb2 = (FakePCB*) List_detach(&os->ready, args->shortest);                                   
-    assert(pcb2->events.first);                                                           
-    ProcessEvent* e2 = (ProcessEvent*)pcb2->events.first;                                  
-    assert(e2->type==CPU); 
-    os->running[i] = pcb2;
-    args->running_prediction = args->best;                                                      
-  }
-  else {                                                                                        // if all the cpus are running a process, check if there's a process with a shortest prediction and do a preemption
-    if (args->running_prediction > args->best) {                                                // if the updated prediction isn't the best one, swap the running process
-      FakePCB* pcb2 = (FakePCB*) List_detach(&os->ready, args->shortest);
-      List_pushBack(&os->ready, (ListItem*) os->running[i]); 
-      assert(pcb2->events.first);                                
-      ProcessEvent* e2 = (ProcessEvent*)pcb2->events.first;                     
-      assert(e2->type==CPU); 
-      os->running[i] = pcb2;
-      args->running_prediction = args->best;
-    }
-  }
+  if (os->running[i]) {                                                                         // if a process is running, increment process's time quantum and update the prediction
+    os->running[i]->q_current += 1;                                                             
+    os->running[i]->prediction = 0.5 * os->running[i]->q_current + 0.5 * os->running[i]->prediction;    
+    //printf("pid: %d, new prediction: %f\n", os->running[i]->pid, os->running[i]->prediction);  
+  }        
 }
 
 typedef struct {
@@ -116,9 +109,7 @@ int main(int argc, char** argv) {
     os.schedule_fn = schedRR;
   }
   if (strcmp(schedule, "schedSJF") == 0) {
-    ssjf_args.prediction = 0.0;
     ssjf_args.best = 0.0;
-    ssjf_args.running_prediction = 0.0;
     ssjf_args.shortest = NULL;
     os.schedule_args = &ssjf_args;
     os.schedule_fn = schedSJF;

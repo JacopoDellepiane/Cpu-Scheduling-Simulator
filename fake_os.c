@@ -45,6 +45,8 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
   new_pcb->list.next=new_pcb->list.prev=0;
   new_pcb->pid=p->pid;
   new_pcb->events=p->events;
+  new_pcb->q_current = 0;                                                           // initialize process's time quantum
+  new_pcb->prediction = 0;                                                          // initialize process's quantum prediction
 
   assert(new_pcb->events.first && "process without events");
 
@@ -155,6 +157,7 @@ void FakeOS_simStep(FakeOS* os){
             break;
           case IO:
             printf("\t\tmove to waiting\n");
+            running->q_current = 0;                                                 // reset process's time quantum
             List_pushBack(&os->waiting, (ListItem*) running);
             break;
           }
@@ -168,7 +171,7 @@ void FakeOS_simStep(FakeOS* os){
   // call schedule, if defined
   for (int i = 0; i < os->N; i++) {                                                 // call schedule on every cpus to verify if preemption is needed
     if (os->schedule_fn){
-      (*os->schedule_fn)(os, os->schedule_args, i);                                 // pass the i-th cpu to the schedule function
+      (*os->schedule_fn)(os, os->schedule_args, i);                                 // pass the i-th cpu to the schedule function                                 
     }
 
     // if running not defined and ready queue not empty
